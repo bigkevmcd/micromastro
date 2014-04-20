@@ -1,6 +1,6 @@
 package main
 
-// Handles notifications from Jenkins and queues a message in RabbitMQ with the
+// Handles notifications from Jenkins and queues a message in NSQ with the
 // details of the notification.
 
 import (
