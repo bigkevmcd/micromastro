@@ -6,7 +6,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -44,7 +43,7 @@ func (n NotificationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var not Notification
 	err := decoder.Decode(&not)
 	if err != nil {
-		fmt.Printf("%s\n", err)
+		log.Println(err)
 	} else {
 		n.notifications <- not
 	}
@@ -54,6 +53,8 @@ func main() {
 	notifications := make(chan Notification, *chanSize)
 	http.Handle("/notifications", NotificationsHandler{notifications})
 	go sendNotifications(notifications)
+
+    log.Printf("Listening on %s\n", *port)
 	http.ListenAndServe(*port, nil)
 }
 
@@ -80,12 +81,14 @@ func sendNotifications(notifications chan Notification) {
 		log.Fatalf("Exchange Declare: %s", err)
 	}
 
+    log.Printf("Connected to %s\n", *amqpURI)
 	for {
 		select {
 		case n := <-notifications:
 			body, err := json.Marshal(n)
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
+				continue
 			}
 			channel.Publish(
 				*exchangeName,
