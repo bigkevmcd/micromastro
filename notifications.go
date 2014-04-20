@@ -15,7 +15,7 @@ import (
 var (
 	amqpURI      = flag.String("uri", "amqp://guest:guest@localhost:5672/", "AMQP URI")
 	exchangeName = flag.String("exchange", "amqp.fanout", "Durable AMQP exchange name")
-	port         = flag.String("post", ":8080", "Listen on port")
+	port         = flag.String("port", ":8080", "Listen on port")
 	chanSize     = flag.Int("queue", 5, "Size of channel for notifications")
 	key          = flag.String("key", "notifications.jenkins.build", "Routing key")
 )
