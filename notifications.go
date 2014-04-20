@@ -9,15 +9,14 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/streadway/amqp"
+	"github.com/bitly/go-nsq"
 )
 
 var (
-	amqpURI      = flag.String("uri", "amqp://guest:guest@localhost:5672/", "AMQP URI")
-	exchangeName = flag.String("exchange", "amqp.fanout", "Durable AMQP exchange name")
-	port         = flag.String("port", ":8080", "Listen on port")
-	chanSize     = flag.Int("queue", 5, "Size of channel for notifications")
-	key          = flag.String("key", "notifications.jenkins.build", "Routing key")
+	nsqURI   = flag.String("uri", "localhost:4150", "NSQ URI")
+	port     = flag.String("port", ":8080", "Listen on port")
+	chanSize = flag.Int("queue", 5, "Size of channel for notifications")
+	key      = flag.String("key", "notifications.jenkins.build", "Routing key")
 )
 
 type Notification struct {
@@ -59,29 +58,9 @@ func main() {
 }
 
 func sendNotifications(notifications chan Notification) {
-	connection, err := amqp.Dial(*amqpURI)
-	if err != nil {
-		log.Fatalf("Dial: %s", err)
-	}
-	defer connection.Close()
-	channel, err := connection.Channel()
-	if err != nil {
-		log.Fatalf("Channel: %s", err)
-	}
-	err = channel.ExchangeDeclare(
-		*exchangeName, // name
-		"fanout",      // type
-		true,          // durable
-		false,         // auto-deleted
-		false,         // internal
-		false,         // noWait
-		nil,           // arguments
-	)
-	if err != nil {
-		log.Fatalf("Exchange Declare: %s", err)
-	}
+	writer := nsq.NewWriter(*nsqURI)
 
-	log.Printf("Connected to %s\n", *amqpURI)
+	log.Printf("Connected to %s\n", *nsqURI)
 	for {
 		select {
 		case n := <-notifications:
@@ -90,20 +69,10 @@ func sendNotifications(notifications chan Notification) {
 				log.Println(err)
 				continue
 			}
-			channel.Publish(
-				*exchangeName,
-				*key,
-				false, // mandatory
-				false, // immediate
-				amqp.Publishing{
-					Headers:         amqp.Table{},
-					ContentType:     "application/json",
-					ContentEncoding: "",
-					Body:            body,
-					DeliveryMode:    amqp.Transient,
-					Priority:        0,
-				},
-			)
+			_, _, err = writer.Publish(*key, body)
+			if err != nil {
+				log.Println(err)
+			}
 		}
 	}
 }
