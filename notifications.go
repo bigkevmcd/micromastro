@@ -9,6 +9,10 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/rcrowley/go-metrics"
+	"github.com/rcrowley/go-metrics/influxdb"
+
+	"github.com/rcrowley/go-tigertonic"
 	"github.com/streadway/amqp"
 )
 
@@ -51,10 +55,17 @@ func (n NotificationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 func main() {
 	notifications := make(chan Notification, *chanSize)
-	http.Handle("/notifications", NotificationsHandler{notifications})
+	http.Handle("/notifications", tigertonic.Timed(NotificationsHandler{notifications}, *key, nil))
 	go sendNotifications(notifications)
 
-    log.Printf("Listening on %s\n", *port)
+	go influxdb.Influxdb(metrics.DefaultRegistry, 10e9, &influxdb.Config{
+		Host:     "127.0.0.1:8086",
+		Database: "metrics",
+		Username: "test",
+		Password: "test",
+	})
+
+	log.Printf("Listening on %s\n", *port)
 	http.ListenAndServe(*port, nil)
 }
 
@@ -81,7 +92,7 @@ func sendNotifications(notifications chan Notification) {
 		log.Fatalf("Exchange Declare: %s", err)
 	}
 
-    log.Printf("Connected to %s\n", *amqpURI)
+	log.Printf("Connected to %s\n", *amqpURI)
 	for {
 		select {
 		case n := <-notifications:
