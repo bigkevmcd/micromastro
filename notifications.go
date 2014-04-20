@@ -5,20 +5,29 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 
 	"github.com/streadway/amqp"
 )
 
 var (
-	amqpURI      = flag.String("uri", "amqp://guest:guest@localhost:5672/", "AMQP URI")
-	exchangeName = flag.String("exchange", "amqp.fanout", "Durable AMQP exchange name")
-	port         = flag.String("port", ":8080", "Listen on port")
-	chanSize     = flag.Int("queue", 5, "Size of channel for notifications")
-	key          = flag.String("key", "notifications.jenkins.build", "Routing key")
+	amqpURI      = getEnvWithDefault("MASTRO_AMQP_URI", "amqp://guest:guest@localhost:5672/")
+	exchangeName = getEnvWithDefault("MASTRO_EXCHANGE", "amqp.fanout")
+	port         = getEnvWithDefault("MASTRO_NOTIFICATIONS_PORT", ":8080")
+	chanSize     = getEnvWithDefault("MASTRO_NOTIFICATIONS_QUEUE_SIZE", "5")
+	key          = getEnvWithDefault("MASTRO_NOTIFICATIONS_KEY", "notifications.jenkins.build")
 )
+
+func getEnvWithDefault(key string, defaultVal string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		val = defaultVal
+	}
+	return val
+}
 
 type Notification struct {
 	Build struct {
@@ -28,10 +37,6 @@ type Notification struct {
 	} `json:"build"`
 	Name string `json:"name"`
 	Url  string `json:"url"`
-}
-
-func init() {
-	flag.Parse()
 }
 
 type NotificationsHandler struct {
@@ -50,16 +55,20 @@ func (n NotificationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 func main() {
-	notifications := make(chan Notification, *chanSize)
+	chanSize, err := strconv.ParseInt(chanSize, 10, 8)
+	if err != nil {
+		log.Fatal("MASTRO_NOTIFICATIONS_QUEUE_SIZE must be a valid integer")
+	}
+	notifications := make(chan Notification, chanSize)
 	http.Handle("/notifications", NotificationsHandler{notifications})
 	go sendNotifications(notifications)
 
-	log.Printf("Listening on %s\n", *port)
-	http.ListenAndServe(*port, nil)
+	log.Printf("Listening on %s\n", port)
+	log.Fatal(http.ListenAndServe(port, nil))
 }
 
 func sendNotifications(notifications chan Notification) {
-	connection, err := amqp.Dial(*amqpURI)
+	connection, err := amqp.Dial(amqpURI)
 	if err != nil {
 		log.Fatalf("Dial: %s", err)
 	}
@@ -69,19 +78,18 @@ func sendNotifications(notifications chan Notification) {
 		log.Fatalf("Channel: %s", err)
 	}
 	err = channel.ExchangeDeclare(
-		*exchangeName, // name
-		"fanout",      // type
-		true,          // durable
-		false,         // auto-deleted
-		false,         // internal
-		false,         // noWait
-		nil,           // arguments
+		exchangeName, // name
+		"fanout",     // type
+		true,         // durable
+		false,        // auto-deleted
+		false,        // internal
+		false,        // noWait
+		nil,          // arguments
 	)
 	if err != nil {
 		log.Fatalf("Exchange Declare: %s", err)
 	}
-
-	log.Printf("Connected to %s\n", *amqpURI)
+	log.Printf("Connected to %s\n", amqpURI)
 	for {
 		select {
 		case n := <-notifications:
@@ -91,8 +99,8 @@ func sendNotifications(notifications chan Notification) {
 				continue
 			}
 			channel.Publish(
-				*exchangeName,
-				*key,
+				exchangeName,
+				key,
 				false, // mandatory
 				false, // immediate
 				amqp.Publishing{
