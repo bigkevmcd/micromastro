@@ -54,7 +54,7 @@ func main() {
 	http.Handle("/notifications", NotificationsHandler{notifications})
 	go sendNotifications(notifications)
 
-    log.Printf("Listening on %s\n", *port)
+	log.Printf("Listening on %s\n", *port)
 	http.ListenAndServe(*port, nil)
 }
 
@@ -81,7 +81,7 @@ func sendNotifications(notifications chan Notification) {
 		log.Fatalf("Exchange Declare: %s", err)
 	}
 
-    log.Printf("Connected to %s\n", *amqpURI)
+	log.Printf("Connected to %s\n", *amqpURI)
 	for {
 		select {
 		case n := <-notifications:
