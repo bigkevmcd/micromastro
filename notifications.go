@@ -7,27 +7,19 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
+	"github.com/bigkevmcd/micromastro/utils"
 	"github.com/streadway/amqp"
 )
 
 var (
-	amqpURI      = getEnvWithDefault("MASTRO_AMQP_URI", "amqp://guest:guest@localhost:5672/")
-	exchangeName = getEnvWithDefault("MASTRO_EXCHANGE", "amqp.fanout")
-	port         = getEnvWithDefault("MASTRO_NOTIFICATIONS_PORT", ":8080")
-	chanSize     = getEnvWithDefault("MASTRO_NOTIFICATIONS_QUEUE_SIZE", "5")
-	key          = getEnvWithDefault("MASTRO_NOTIFICATIONS_KEY", "notifications.jenkins.build")
+	amqpURI      = utils.GetEnvWithDefault("MASTRO_AMQP_URI", "amqp://guest:guest@localhost:5672/")
+	exchangeName = utils.GetEnvWithDefault("MASTRO_EXCHANGE", "amqp.fanout")
+	port         = utils.GetEnvWithDefault("MASTRO_NOTIFICATIONS_PORT", ":8080")
+	chanSize     = utils.GetEnvWithDefault("MASTRO_NOTIFICATIONS_QUEUE_SIZE", "5")
+	key          = utils.GetEnvWithDefault("MASTRO_NOTIFICATIONS_KEY", "notifications.jenkins.build")
 )
-
-func getEnvWithDefault(key string, defaultVal string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		val = defaultVal
-	}
-	return val
-}
 
 type Notification struct {
 	Build struct {
