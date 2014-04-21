@@ -53,6 +53,7 @@ func main() {
     n.AddHandler(MessageHandler{})
     n.ConnectToNSQ(*nsqURI)
 
+  // This is just here to ensure that the process doesn't end...
   http.Handle("/status", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
   http.ListenAndServe(":9192", nil)
 }
