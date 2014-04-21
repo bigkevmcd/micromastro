@@ -8,8 +8,11 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"os"
 
 	"github.com/bigkevmcd/micromastro/utils"
+	"github.com/rcrowley/go-metrics"
+	"github.com/rcrowley/go-tigertonic"
 	"github.com/streadway/amqp"
 )
 
@@ -47,13 +50,15 @@ func (n NotificationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 func main() {
-	chanSize, err := strconv.ParseInt(chanSize, 10, 8)
+	chanSize, err := strconv.Atoi(chanSize)
 	if err != nil {
 		log.Fatal("MASTRO_NOTIFICATIONS_QUEUE_SIZE must be a valid integer")
 	}
 	notifications := make(chan Notification, chanSize)
-	http.Handle("/notifications", NotificationsHandler{notifications})
+	http.Handle("/notifications", tigertonic.Timed(NotificationsHandler{notifications}, key, nil))
 	go sendNotifications(notifications)
+
+	go metrics.Log(metrics.DefaultRegistry, 60e9, log.New(os.Stderr, "metrics: ", log.Lmicroseconds))
 
 	log.Printf("Listening on %s\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))
@@ -71,7 +76,7 @@ func sendNotifications(notifications chan Notification) {
 	}
 	err = channel.ExchangeDeclare(
 		exchangeName, // name
-		"fanout",     // type
+		"topic",     // type
 		true,         // durable
 		false,        // auto-deleted
 		false,        // internal
@@ -82,6 +87,7 @@ func sendNotifications(notifications chan Notification) {
 		log.Fatalf("Exchange Declare: %s", err)
 	}
 	log.Printf("Connected to %s\n", amqpURI)
+
 	for {
 		select {
 		case n := <-notifications:
