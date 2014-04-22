@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strconv"
 	"os"
+	"strconv"
 
 	"github.com/bigkevmcd/micromastro/utils"
 	"github.com/rcrowley/go-metrics"
@@ -76,7 +76,7 @@ func sendNotifications(notifications chan Notification) {
 	}
 	err = channel.ExchangeDeclare(
 		exchangeName, // name
-		"topic",     // type
+		"topic",      // type
 		true,         // durable
 		false,        // auto-deleted
 		false,        // internal
